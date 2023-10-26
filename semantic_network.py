@@ -16,7 +16,6 @@
 #     - Subtype     - uma relacao de subtipo entre dois tipos
 #     - Member      - uma relacao de pertenca de uma instancia a um tipo
 #
-
 class Relation:
     def __init__(self,e1,rel,e2):
         self.entity1 = e1
@@ -95,5 +94,81 @@ class SemanticNetwork:
     def show_query_result(self):
         for d in self.query_result:
             print(str(d))
+    
+    def list_associations(self):
+        associations = set([])
+        for d in self.query_local():
+            if isinstance(d.relation, Association):
+                associations.add(d.relation.name)
+        return associations
+
+    def list_objects(self):
+        objects = set([])
+        for d in self.query_local():
+            if isinstance(d.relation, Member):
+                objects.add(d.relation.entity1)
+        return objects
+    
+    def list_users(self):
+        users = set([])
+        for d in self.query_local():
+            users.add(d.user)
+        return users
+    
+    def list_types(self):
+        types = set([])
+        for d in self.query_local():
+            if isinstance(d.relation, (Subtype, Member)):
+                types.add(d.relation.entity2)
+        return types
+    
+    def list_local_associations(self, entity):
+        associations = set([])
+        for d in self.query_local(None, entity):
+            if isinstance(d.relation, Association):
+                associations.add(d.relation.name)
+        return associations
+    
+    def list_relations_by_user(self, user):
+        relations = set([])
+        for d in self.query_local(user):
+            relations.add(d.relation.name)
+        return relations
+    
+    def associations_by_user(self, user):
+        associations = set([])
+        for d in self.query_local(user):
+            if isinstance(d.relation, Association):
+                associations.add(d.relation.name)
+        return len(associations)
+    
+    def list_local_associations_by_entity(self, entity):
+        assocByEnt = []
+        for d in self.query_local(None, entity):
+            if isinstance(d.relation, Association):
+                if (d.relation.name, d.user) not in assocByEnt:
+                    assocByEnt.append((d.relation.name, d.user))
+        return assocByEnt
+    
+    def predecessor(self, entityA, entityB):
+        queue = ([entityB])
+        visited = set([entityB])
+
+        while queue:
+            current_entity = queue.pop()
+            if current_entity == entityA:
+                return True
+            for d in self.query_local(None, current_entity, None, None):
+                if isinstance(d.relation, (Subtype, Member)):
+                    predecessor = d.relation.entity2
+                    if predecessor not in visited:
+                        queue.append(predecessor)
+                        visited.add(predecessor)
+        return False
+    
+
+    
+
+
 
 
