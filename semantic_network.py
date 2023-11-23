@@ -16,6 +16,9 @@
 #     - Subtype     - uma relacao de subtipo entre dois tipos
 #     - Member      - uma relacao de pertenca de uma instancia a um tipo
 #
+from collections import Counter
+
+
 class Relation:
     def __init__(self,e1,rel,e2):
         self.entity1 = e1
@@ -33,9 +36,18 @@ class Relation:
 class Association(Relation):
     def __init__(self,e1,assoc,e2):
         Relation.__init__(self,e1,assoc,e2)
-
+        
 #   Exemplo:
 #   a = Association('socrates','professor','filosofia')
+
+class AssocOne(Relation):
+    def __init__(self,e1,assoc,e2):
+        Relation.__init__(self,e1,assoc,e2)
+
+
+class AssocNum(Relation):
+    def __init__(self,e1,assoc,e2):
+        Relation.__init__(self,e1,assoc,float(e2))
 
 # Subclasse Subtype
 class Subtype(Relation):
@@ -164,11 +176,122 @@ class SemanticNetwork:
                     if predecessor not in visited:
                         queue.append(predecessor)
                         visited.add(predecessor)
+
+        #pds = [d.relation.entity2 for d in self.declarations 
+        # if (d.relation.emtity1 == entityB) 
+        # and (isinstance(d.relation, (Member, Subtype)))]
+
+        #if entityA in pds:
+        #    return True
+        
+        #return any([self.predecessor(entityA, p) for p in pds])
         return False
     
+    def predecessor_path(self, entityA, entityB):
 
+        if entityA == entityB:
+            return [entityB]
+
+        for d in self.declarations:
+            if isinstance(d.relation, (Subtype, Member)) and d.relation.entity1 == entityB:
+                path = self.predecessor_path(entityA, d.relation.entity2)
+                if path:
+                    return path + [entityB]
+                
+        return None
     
+    def query(self, entity, association=None):
+        pds = [self.query(d.relation.entity2, association) for d in self.declarations if isinstance(d.relation, (Member, Subtype)) and d.relation.entity1==entity]
+        
+        pds_query = [d for sublist in pds for d in sublist]
+        q = self.query_local(e1=entity, rel=association)
+        lista = []
+        for d in q:
+            if isinstance(d.relation, Association):
+                lista.append(d)
+        
+        return pds_query + lista
+    
+    def query2(self, entity, association=None):
+        pds = [self.query(d.relation.entity2, association) for d in self.declarations if isinstance(d.relation, (Member, Subtype)) and d.relation.entity1==entity]
+        pds_query = [d for sublist in pds for d in sublist]
+        self.query_local(e1=entity, rel=association)
+        return pds_query + self.query_local(e1=entity, rel=association)
 
+    def query_cancel(self, entity, association):
+        pds = [self.query_cancel(d.relation.entity2, association) for d in self.declarations if isinstance(d.relation, (Member, Subtype)) and d.relation.entity1==entity]
+        
+        q = self.query_local(e1=entity, rel=association)
+
+        pds_query = [d for sublist in pds for d in sublist if d.relation.name not in [l.relation.name for l in q]]
+        
+        return pds_query + q
+
+    def query_down(self, entity, association, first = True):
+        desc = [self.query_down(d.relation.entity1, association, first=False) for d in self.declarations if isinstance(d.relation, (Member, Subtype)) and d.relation.entity2==entity]
+
+        query = [d for sublist in desc for d in sublist]
+
+        if first:
+            return query
+        
+        local = self.query_local(e1 = entity, rel=association)
+
+        return query + local
+    
+    def query_induce (self, entity, association):
+        
+        query = self.query_down(entity, association)
+
+        vals = [d.relation.entity2 for d in query]
+
+        count = {}
+
+        for v in vals:
+            count[v] = count.get(v, 0) + 1
+            
+        return max(count, key=count.get)
+    
+    def query_local_assoc(self, entity, association):
+        q = self.query_local(e1=entity, rel=association)
+
+        if all(isinstance(d.relation, AssocOne) for d in q):
+            assoc = Counter([d.relation.entity2 for d in q]).most_common(1)
+            return (assoc[0][0], assoc[0][1] /len(q))
+        if all(isinstance(d.relation, AssocNum) for d in q):
+            return sum([d.relation.entity2 for d in q]) / len(q)
+        if all(isinstance(d.relation, Association) for d in q):
+            val = [d.relation.entity2 for d in q]
+            count = [(v, val.count(v)/len(q)) for v in set(val) if val.count(v) > 1 ]
+            res = sorted(count, key=lambda x: x[0])
+            return sorted(res, key=lambda x: x[1], reverse=True)  
+            
+ 
+    def query_assoc_value(self, e, a):
+        q = self.query_local(e1=e, rel=a)
+        local_values = [d.relation.entity2 for d in q]
+        if len(set(local_values)) == 1:
+            return local_values[0]
+        else:
+            max_value = None
+            max_score = -1
+            for v in set(local_values):
+                L = local_values.count(v) / len(local_values)
+                H = sum([1 for d in self.query(e, a) if d.relation.entity2 == v]) / len(self.query(e, a))
+                score = L + H / 2
+                if score > max_score:
+                    max_value = v
+                    max_score = score
+            if max_value is not None:
+                return max_value
+            else:
+                all_values = [d.relation.entity2 for d in self.query(e, a)]
+                return max(set(all_values), key=all_values.count)
+            
+                    
+
+
+                    
 
 
 

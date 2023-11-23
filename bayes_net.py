@@ -6,6 +6,8 @@ class BayesNet:
         if not ldep:
             ldep = {}
         self.dependencies = ldep
+        
+        
 
     # The network data is stored in a dictionary that
     # associates the dependencies to each variable:
@@ -27,6 +29,12 @@ class BayesNet:
                 if mothers.issubset(conjunction):
                     prob*=(p if val else 1-p)
         return prob
+    
+    def individualProb(self, var, value):
+        count = 0
+        for (mothers, p) in self.dependencies[var].items():
+            count += self.jointProb(list(mothers) + [(var, value)]) 
+        return count
 
 
 # Footnote 1:
